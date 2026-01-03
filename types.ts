@@ -1,9 +1,18 @@
 
+export interface User {
+  id: string;
+  nickname: string;
+  age: number;
+  lastPeriodDate: string; // YYYY-MM-DD
+  height: number; // cm
+  weight: number; // kg
+  healthNotes: string; // 基础疾病情况，如血糖、血液等
+}
+
 export interface PregnancyData {
-  lastPeriodDate: string;
-  dueDate: string;
   currentWeek: number;
   daysRemaining: number;
+  dueDate: string;
 }
 
 export interface Checkup {
@@ -23,18 +32,12 @@ export interface JournalEntry {
   note: string;
 }
 
-export interface FoodTip {
-  name: string;
-  benefit: string;
-  recommendation: 'EAT' | 'MODERATE' | 'AVOID';
-  category: string;
-}
-
 export enum AppScreen {
+  AUTH = 'auth',
   DASHBOARD = 'dashboard',
   HEALTH = 'health',
   CHECKUPS = 'checkups',
   JOURNAL = 'journal',
   AI_CHAT = 'ai_chat',
-  SETTINGS = 'settings'
+  PROFILE = 'profile'
 }
