@@ -7,14 +7,22 @@ const Glucose: React.FC = () => {
   const [value, setValue] = useState('');
   const [type, setType] = useState<GlucoseLog['timeType']>('fasting');
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isHistoryMode, setIsHistoryMode] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importData, setImportData] = useState('');
 
-  // 初始化加载本地存储
   useEffect(() => {
     const saved = localStorage.getItem('mama_glucose_logs');
     if (saved) {
       setLogs(JSON.parse(saved).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     }
   }, []);
+
+  const saveLogs = (newLogs: GlucoseLog[]) => {
+    const sorted = [...newLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setLogs(sorted);
+    localStorage.setItem('mama_glucose_logs', JSON.stringify(sorted));
+  };
 
   const addLog = () => {
     if (!value) return;
@@ -24,13 +32,15 @@ const Glucose: React.FC = () => {
       timeType: type,
       value: parseFloat(value)
     };
-    
-    const updatedLogs = [newLog, ...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setLogs(updatedLogs);
-    localStorage.setItem('mama_glucose_logs', JSON.stringify(updatedLogs));
+    saveLogs([newLog, ...logs]);
     setValue('');
-    // 成功后重置为今天，方便下次记录
-    setRecordDate(new Date().toISOString().split('T')[0]);
+    setIsHistoryMode(false);
+  };
+
+  const deleteLog = (id: string) => {
+    if (window.confirm("确认删除这条记录吗？")) {
+      saveLogs(logs.filter(l => l.id !== id));
+    }
   };
 
   const getStatus = (v: number, t: GlucoseLog['timeType']) => {
@@ -41,75 +51,83 @@ const Glucose: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in pb-24">
-      <h1 className="text-2xl font-bold text-gray-800">血糖监测中心</h1>
-      
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 space-y-5">
-        <div className="flex bg-gray-50 p-1 rounded-2xl">
-          <button onClick={() => setType('fasting')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${type === 'fasting' ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>空腹</button>
-          <button onClick={() => setType('postMeal1h')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${type === 'postMeal1h' ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>餐后1h</button>
-          <button onClick={() => setType('postMeal2h')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${type === 'postMeal2h' ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>餐后2h</button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 mb-1 ml-1 uppercase">测量日期 (支持补录历史)</label>
-            <input 
-              type="date" 
-              value={recordDate} 
-              onChange={e => setRecordDate(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-pink-200"
-            />
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <label className="block text-[10px] font-bold text-gray-400 mb-1 ml-1 uppercase">数值 (mmol/L)</label>
-              <input 
-                type="number" value={value} onChange={e => setValue(e.target.value)}
-                placeholder="0.0" className="w-full text-3xl font-bold text-gray-800 border-none bg-gray-50 rounded-xl p-3 outline-none"
-              />
-            </div>
-            <button onClick={addLog} className="bg-pink-500 text-white font-bold px-8 h-[58px] mt-5 rounded-2xl shadow-lg shadow-pink-100 active:scale-95 transition-all">记录</button>
-          </div>
-        </div>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">血糖监测中心</h1>
+        <button onClick={() => setShowImport(!showImport)} className="text-[10px] font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-full">
+          数据管理
+        </button>
       </div>
 
-      {/* 数据概览 */}
-      {logs.length > 0 && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-            <p className="text-[10px] text-blue-400 font-bold uppercase">最高血糖</p>
-            <p className="text-xl font-bold text-blue-700">{Math.max(...logs.map(l => l.value))} <span className="text-xs">mmol/L</span></p>
-          </div>
-          <div className="bg-green-50 p-4 rounded-2xl border border-green-100">
-            <p className="text-[10px] text-green-400 font-bold uppercase">异常记录</p>
-            <p className="text-xl font-bold text-green-700">{logs.filter(l => getStatus(l.value, l.timeType) === '偏高').length} <span className="text-xs">次</span></p>
+      {showImport && (
+        <div className="bg-white p-6 rounded-3xl border-2 border-dashed border-blue-100 space-y-4 animate-slide-down">
+          <textarea 
+            value={importData}
+            onChange={e => setImportData(e.target.value)}
+            className="w-full h-24 bg-gray-50 border-none rounded-xl p-3 text-[10px] font-mono"
+            placeholder='JSON 批量补录...'
+          />
+          <div className="flex space-x-2">
+            <button onClick={() => {
+              try {
+                const p = JSON.parse(importData);
+                if(Array.isArray(p)) saveLogs([...p, ...logs]);
+                setShowImport(false);
+              } catch(e) { alert("格式错误"); }
+            }} className="flex-1 bg-blue-500 text-white text-xs font-bold py-2 rounded-xl">导入</button>
+            <button onClick={() => {
+              navigator.clipboard.writeText(JSON.stringify(logs));
+              alert("已导出");
+            }} className="flex-1 bg-gray-100 text-gray-600 text-xs font-bold py-2 rounded-xl">导出</button>
           </div>
         </div>
       )}
 
-      <div className="space-y-3">
-        <h2 className="font-bold text-gray-800 flex justify-between items-center">
-          <span>历史记录</span>
-          <span className="text-[10px] text-gray-400 font-normal">共 {logs.length} 条数据</span>
-        </h2>
-        {logs.length === 0 ? <p className="text-center py-10 text-gray-300 text-sm italic">暂无数据，请开始记录您的第一笔血糖数值</p> : (
-          logs.map(log => (
-            <div key={log.id} className="bg-white p-4 rounded-2xl flex items-center justify-between shadow-sm border border-gray-50 hover:border-pink-100 transition-colors">
-              <div className="flex items-center space-x-3">
-                <div className={`w-2 h-10 rounded-full ${getStatus(log.value, log.timeType) === '正常' ? 'bg-green-400' : 'bg-rose-400'}`} />
-                <div>
-                  <p className="text-sm font-bold text-gray-700">{log.value} <span className="text-[10px] font-normal text-gray-400">mmol/L</span></p>
-                  <p className="text-[10px] text-gray-400">
-                    <span className="font-bold text-gray-500">{log.timeType === 'fasting' ? '空腹' : '餐后'}</span> • {log.date}
-                  </p>
-                </div>
-              </div>
-              <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${getStatus(log.value, log.timeType) === '正常' ? 'bg-green-50 text-green-500' : 'bg-rose-50 text-rose-500'}`}>
-                {getStatus(log.value, log.timeType)}
-              </span>
-            </div>
-          ))
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 space-y-5">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{isHistoryMode ? '补录过去数据' : '记录最新血糖'}</span>
+          <button onClick={() => setIsHistoryMode(!isHistoryMode)} className="text-[10px] text-blue-400 underline">{isHistoryMode ? '记此刻' : '记历史'}</button>
+        </div>
+
+        {isHistoryMode && (
+          <input 
+            type="date" value={recordDate} onChange={e => setRecordDate(e.target.value)}
+            className="w-full bg-gray-50 border-none rounded-xl p-3 text-sm ring-2 ring-blue-50"
+          />
         )}
+
+        <div className="flex bg-gray-50 p-1 rounded-2xl">
+          {(['fasting', 'postMeal1h', 'postMeal2h'] as const).map(t => (
+            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${type === t ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>
+              {t === 'fasting' ? '空腹' : t === 'postMeal1h' ? '餐后1h' : '餐后2h'}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <div className="flex-1">
+            <input 
+              type="number" value={value} onChange={e => setValue(e.target.value)}
+              placeholder="0.0" className="w-full text-4xl font-bold text-gray-800 border-none bg-transparent outline-none"
+            />
+          </div>
+          <button onClick={addLog} className="bg-pink-500 text-white font-bold px-8 h-14 rounded-2xl shadow-lg shadow-pink-100 active:scale-95">保存</button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="font-bold text-gray-800">数据展示墙</h2>
+        {logs.map(log => (
+          <div key={log.id} className="group bg-white p-4 rounded-2xl flex items-center justify-between shadow-sm border border-gray-50">
+            <div className="flex items-center space-x-3">
+              <div className={`w-1.5 h-8 rounded-full ${getStatus(log.value, log.timeType) === '正常' ? 'bg-green-400' : 'bg-rose-400'}`} />
+              <div>
+                <p className="text-sm font-bold text-gray-700">{log.value} <span className="text-[10px] font-normal text-gray-400">mmol/L</span></p>
+                <p className="text-[10px] text-gray-400">{log.date} • {log.timeType === 'fasting' ? '空腹' : '餐后'}</p>
+              </div>
+            </div>
+            <button onClick={() => deleteLog(log.id)} className="opacity-0 group-hover:opacity-100 text-xs text-rose-300">删除</button>
+          </div>
+        ))}
       </div>
     </div>
   );
