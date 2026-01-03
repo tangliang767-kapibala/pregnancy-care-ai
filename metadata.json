@@ -1,0 +1,7 @@
+{
+  "name": "Copy of 悦妈助手 (MamaCare)",
+  "description": "一站式孕期管理应用，提供孕期追踪、饮食建议、产检提醒及AI育儿咨询。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
