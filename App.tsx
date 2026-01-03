@@ -7,6 +7,7 @@ import Checkups from './screens/Checkups';
 import Journal from './screens/Journal';
 import Chat from './screens/Chat';
 import Auth from './screens/Auth';
+import Glucose from './screens/Glucose';
 import Navigation from './components/Navigation';
 import { calculatePregnancyData } from './utils/pregnancyUtils';
 
@@ -14,7 +15,6 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.DASHBOARD);
   
-  // 检查本地存储是否有用户
   useEffect(() => {
     const savedUser = localStorage.getItem('mama_user');
     if (savedUser) {
@@ -31,23 +31,27 @@ const App: React.FC = () => {
   const renderScreen = () => {
     switch (currentScreen) {
       case AppScreen.DASHBOARD:
-        return <Dashboard user={user} />;
+        return <Dashboard user={user} setScreen={setCurrentScreen} />;
       case AppScreen.HEALTH:
         return <Health />;
       case AppScreen.CHECKUPS:
-        return <Checkups />;
+        return <Checkups user={user} />;
       case AppScreen.JOURNAL:
         return <Journal />;
       case AppScreen.AI_CHAT:
         return <Chat user={user} currentWeek={pregData.currentWeek} />;
+      case AppScreen.GLUCOSE:
+        return <Glucose />;
       default:
-        return <Dashboard user={user} />;
+        return <Dashboard user={user} setScreen={setCurrentScreen} />;
     }
   };
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#fef2f2] relative overflow-x-hidden pb-16 shadow-2xl">
-      {renderScreen()}
+      <div className="min-h-screen pb-20">
+        {renderScreen()}
+      </div>
       <Navigation currentScreen={currentScreen} setScreen={setCurrentScreen} />
     </div>
   );
