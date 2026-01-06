@@ -2,10 +2,23 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { User, GlucoseLog } from "../types";
 
-// 获取 AI 实例的内部函数，确保每次调用时都尝试获取最新的环境变量
+/**
+ * 智能获取 API Key
+ * 尝试从不同的可能位置获取，以适配本地、Vercel 以及不同的打包环境
+ */
+const getApiKey = () => {
+  // @ts-ignore - 兼容 Vite
+  const viteKey = import.meta.env?.VITE_API_KEY;
+  // @ts-ignore - 兼容标准 process.env
+  const processKey = typeof process !== 'undefined' ? process.env?.API_KEY : undefined;
+  
+  return viteKey || processKey;
+};
+
 const getAIInstance = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
+    console.error("Critical: API_KEY is missing. Please set VITE_API_KEY in your environment variables.");
     throw new Error("API_KEY_MISSING");
   }
   return new GoogleGenAI({ apiKey });
@@ -30,13 +43,14 @@ export const analyzeMaternityReport = async (user: User, reportText: string, ima
       model: 'gemini-3-pro-preview',
       contents: { parts },
       config: {
-        systemInstruction: "你是一个资深的妇产科专家。请分析用户的产检报告（文本或图片）。1. 提取关键指标（如HCG, 孕酮, 血糖, 血压, B超结果等）；2. 用通俗易懂的语言解释这些指标代表什么；3. 给出后续的生活或复查建议；4. 语气要专业且充满人文关怀。如果有异常风险，请加粗提醒及时咨询主治医生。",
+        systemInstruction: "你是一个资深的妇产科专家。请分析用户的产检报告。1. 提取关键指标；2. 解释指标含义；3. 给出后续建议；4. 语气要专业且充满人文关怀。",
       }
     });
     return response.text;
   } catch (e: any) {
-    if (e.message === "API_KEY_MISSING") return "错误：未检测到 API Key，请检查环境配置。";
-    throw e;
+    console.error("AI Analysis Error:", e);
+    if (e.message === "API_KEY_MISSING") return "错误：未检测到 API Key。请在 Vercel 项目设置中添加环境变量 VITE_API_KEY。";
+    return `分析出错：${e.message || "未知原因"}`;
   }
 };
 
@@ -49,27 +63,33 @@ export const generateWeeklySummary = async (user: User, week: number, recentWeig
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `请为${user.nickname}生成第${week}周的综合孕期周报。近期体重趋势：${weightStr}，近期血糖记录：${glucoseStr}。基础病史：${user.healthNotes}`,
+      contents: `请为${user.nickname}生成第${week}周健康报告。体重：${weightStr}，血糖：${glucoseStr}。`,
       config: {
-        systemInstruction: "你是一个孕期健康管理专家。请生成一份精美的Markdown格式周度报告。包含：1. 怀孕进展总结；2. 营养与运动建议；3. 体重与血糖趋势评估；4. 下周重要待办事项。语气要温馨。使用丰富的Emoji使内容易读。",
+        systemInstruction: "你是一个孕期健康管理专家。请生成 Markdown 格式的周度报告，语气温馨。",
       }
     });
     return response.text;
   } catch (e: any) {
-    return "暂时无法生成周报，请检查网络或配置。";
+    console.error("Weekly Summary Error:", e);
+    return e.message === "API_KEY_MISSING" ? "请先配置 API Key" : "服务暂时不可用";
   }
 };
 
 export const getPregnancyAdviceStream = async (user: User, week: number, question: string) => {
-  const ai = getAIInstance();
-  const bmi = (user.weight / ((user.height / 100) ** 2)).toFixed(1);
-  return await ai.models.generateContentStream({
-    model: 'gemini-3-pro-preview',
-    contents: `我是${user.nickname}，${user.age}岁。BMI: ${bmi}。健康背景：${user.healthNotes}。第${week}周。问题：${question}`,
-    config: {
-      systemInstruction: "你是一个专业的妇产科医生和营养师。请根据用户提供的指标提供深度个性化的回答，包含Markdown格式排版。",
-    }
-  });
+  try {
+    const ai = getAIInstance();
+    const bmi = (user.weight / ((user.height / 100) ** 2)).toFixed(1);
+    return await ai.models.generateContentStream({
+      model: 'gemini-3-pro-preview',
+      contents: `用户：${user.nickname}，W${week}。问题：${question}`,
+      config: {
+        systemInstruction: "你是一个专业的妇产科助手。请回答用户问题并保持温馨专业。",
+      }
+    });
+  } catch (e: any) {
+    console.error("Stream Error:", e);
+    throw e;
+  }
 };
 
 export const getDailyTips = async (week: number) => {
@@ -77,7 +97,7 @@ export const getDailyTips = async (week: number) => {
     const ai = getAIInstance();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `怀孕第${week}周，提供：1. 饮食建议 2. 生活注意事项 3. 宝宝发育亮点。`,
+      contents: `怀孕第${week}周建议。`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -93,6 +113,6 @@ export const getDailyTips = async (week: number) => {
     });
     return JSON.parse(response.text || '{}');
   } catch (e) {
-    return { diet: "多吃新鲜蔬果", lifestyle: "注意休息", baby: "正在飞速成长" };
+    return { diet: "注意均衡营养", lifestyle: "保持心情愉悦", baby: "正在健康成长" };
   }
 };

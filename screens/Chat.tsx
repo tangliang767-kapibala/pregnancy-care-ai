@@ -47,10 +47,18 @@ const Chat: React.FC<{ user: User, currentWeek: number }> = ({ user, currentWeek
           return newMessages;
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Chat process error:", error);
+      let errorMsg = '服务繁忙，请稍后再试。';
+      if (error.message === "API_KEY_MISSING") {
+        errorMsg = '⚠️ 错误：未配置 API Key。请在 Vercel Settings -> Environment Variables 中添加 VITE_API_KEY。';
+      } else if (error.message?.includes('403')) {
+        errorMsg = '⚠️ 权限错误：API Key 无效或权限受限。';
+      }
+      
       setMessages(prev => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = { role: 'assistant', content: '服务繁忙，请稍后再试。' };
+        newMessages[newMessages.length - 1] = { role: 'assistant', content: errorMsg };
         return newMessages;
       });
     } finally {
