@@ -7,7 +7,6 @@ const Glucose: React.FC = () => {
   const [value, setValue] = useState('');
   const [type, setType] = useState<GlucoseLog['timeType']>('fasting');
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isHistoryMode, setIsHistoryMode] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importData, setImportData] = useState('');
 
@@ -34,13 +33,6 @@ const Glucose: React.FC = () => {
     };
     saveLogs([newLog, ...logs]);
     setValue('');
-    setIsHistoryMode(false);
-  };
-
-  const deleteLog = (id: string) => {
-    if (window.confirm("确认删除这条记录吗？")) {
-      saveLogs(logs.filter(l => l.id !== id));
-    }
   };
 
   const getStatus = (v: number, t: GlucoseLog['timeType']) => {
@@ -51,83 +43,89 @@ const Glucose: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in pb-24">
-      <div className="flex justify-between items-center">
+      <header className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">血糖监测中心</h1>
-        <button onClick={() => setShowImport(!showImport)} className="text-[10px] font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-full">
-          数据管理
+        <button onClick={() => setShowImport(!showImport)} className="bg-blue-50 px-3 py-1.5 rounded-full text-[10px] font-bold text-blue-500">
+          管理历史
         </button>
-      </div>
+      </header>
 
       {showImport && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-dashed border-blue-100 space-y-4 animate-slide-down">
+        <div className="bg-white p-5 rounded-3xl border-2 border-dashed border-blue-100 space-y-3 animate-slide-down">
           <textarea 
             value={importData}
             onChange={e => setImportData(e.target.value)}
-            className="w-full h-24 bg-gray-50 border-none rounded-xl p-3 text-[10px] font-mono"
-            placeholder='JSON 批量补录...'
+            className="w-full h-20 bg-blue-50/20 rounded-xl p-3 text-[10px] font-mono outline-none"
+            placeholder='粘贴血糖记录 JSON...'
           />
-          <div className="flex space-x-2">
-            <button onClick={() => {
-              try {
-                const p = JSON.parse(importData);
-                if(Array.isArray(p)) saveLogs([...p, ...logs]);
-                setShowImport(false);
-              } catch(e) { alert("格式错误"); }
-            }} className="flex-1 bg-blue-500 text-white text-xs font-bold py-2 rounded-xl">导入</button>
-            <button onClick={() => {
-              navigator.clipboard.writeText(JSON.stringify(logs));
-              alert("已导出");
-            }} className="flex-1 bg-gray-100 text-gray-600 text-xs font-bold py-2 rounded-xl">导出</button>
-          </div>
+          <button onClick={() => {
+            try {
+              const p = JSON.parse(importData);
+              if(Array.isArray(p)) saveLogs([...p, ...logs]);
+              setShowImport(false);
+            } catch(e) { alert("数据格式错误"); }
+          }} className="w-full bg-blue-500 text-white py-2 rounded-xl text-xs font-bold">导入历史数据</button>
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-pink-50 space-y-5">
-        <div className="flex justify-between items-center px-1">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{isHistoryMode ? '补录过去数据' : '记录最新血糖'}</span>
-          <button onClick={() => setIsHistoryMode(!isHistoryMode)} className="text-[10px] text-blue-400 underline">{isHistoryMode ? '记此刻' : '记历史'}</button>
+      <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-pink-100/20 border border-white space-y-6">
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">检测日期</label>
+          <input 
+            type="date" 
+            value={recordDate} 
+            onChange={e => setRecordDate(e.target.value)}
+            className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold outline-none ring-2 ring-transparent focus:ring-blue-100"
+          />
         </div>
 
-        {isHistoryMode && (
-          <input 
-            type="date" value={recordDate} onChange={e => setRecordDate(e.target.value)}
-            className="w-full bg-gray-50 border-none rounded-xl p-3 text-sm ring-2 ring-blue-50"
-          />
-        )}
-
-        <div className="flex bg-gray-50 p-1 rounded-2xl">
+        <div className="flex bg-gray-100 p-1 rounded-2xl">
           {(['fasting', 'postMeal1h', 'postMeal2h'] as const).map(t => (
-            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${type === t ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>
+            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2.5 text-[10px] font-bold rounded-xl transition-all ${type === t ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>
               {t === 'fasting' ? '空腹' : t === 'postMeal1h' ? '餐后1h' : '餐后2h'}
             </button>
           ))}
         </div>
 
         <div className="flex items-center space-x-4">
-          <div className="flex-1">
+          <div className="flex-1 bg-gray-50 rounded-2xl p-4 flex items-center justify-between">
             <input 
               type="number" value={value} onChange={e => setValue(e.target.value)}
-              placeholder="0.0" className="w-full text-4xl font-bold text-gray-800 border-none bg-transparent outline-none"
+              placeholder="0.0" className="bg-transparent text-4xl font-bold text-gray-800 border-none outline-none w-24"
             />
+            <span className="text-xs font-bold text-gray-300">mmol/L</span>
           </div>
-          <button onClick={addLog} className="bg-pink-500 text-white font-bold px-8 h-14 rounded-2xl shadow-lg shadow-pink-100 active:scale-95">保存</button>
+          <button onClick={addLog} className="bg-pink-500 text-white font-bold h-16 w-16 rounded-2xl shadow-lg shadow-pink-100 flex items-center justify-center text-xl">
+            ＋
+          </button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <h2 className="font-bold text-gray-800">数据展示墙</h2>
-        {logs.map(log => (
-          <div key={log.id} className="group bg-white p-4 rounded-2xl flex items-center justify-between shadow-sm border border-gray-50">
-            <div className="flex items-center space-x-3">
-              <div className={`w-1.5 h-8 rounded-full ${getStatus(log.value, log.timeType) === '正常' ? 'bg-green-400' : 'bg-rose-400'}`} />
-              <div>
-                <p className="text-sm font-bold text-gray-700">{log.value} <span className="text-[10px] font-normal text-gray-400">mmol/L</span></p>
-                <p className="text-[10px] text-gray-400">{log.date} • {log.timeType === 'fasting' ? '空腹' : '餐后'}</p>
-              </div>
-            </div>
-            <button onClick={() => deleteLog(log.id)} className="opacity-0 group-hover:opacity-100 text-xs text-rose-300">删除</button>
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-gray-800 px-1">监测报告墙</h2>
+        {logs.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-[2.5rem] border border-gray-100">
+            <p className="text-gray-300 text-sm italic font-medium">还没有血糖记录哦</p>
           </div>
-        ))}
+        ) : (
+          logs.map(log => (
+            <div key={log.id} className="bg-white p-5 rounded-3xl flex items-center justify-between border border-gray-50 shadow-sm">
+              <div className="flex items-center space-x-4">
+                <div className={`w-1.5 h-10 rounded-full ${getStatus(log.value, log.timeType) === '正常' ? 'bg-green-400' : 'bg-rose-400'}`} />
+                <div>
+                  <div className="flex items-baseline space-x-1">
+                    <p className="text-lg font-bold text-gray-800">{log.value}</p>
+                    <span className="text-[10px] text-gray-400">mmol/L</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-medium">{log.date} • {log.timeType === 'fasting' ? '空腹' : '餐后'}</p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full ${getStatus(log.value, log.timeType) === '正常' ? 'bg-green-50 text-green-500' : 'bg-rose-50 text-rose-500'}`}>
+                {getStatus(log.value, log.timeType)}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -8,21 +8,28 @@ const Journal: React.FC = () => {
   const [note, setNote] = useState('');
   const [mood, setMood] = useState('😊');
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
-  const [isHistoryMode, setIsHistoryMode] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importData, setImportData] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('mama_journal_entries');
-    if (saved) {
-      setEntries(JSON.parse(saved).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    }
+    loadEntries();
   }, []);
 
+  const loadEntries = () => {
+    const saved = localStorage.getItem('mama_journal_entries');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const sorted = parsed.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setEntries(sorted);
+    }
+  };
+
   const saveToLocal = (newEntries: JournalEntry[]) => {
+    // 强制按日期倒序排列：最新的在最上面
     const sorted = [...newEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setEntries(sorted);
     localStorage.setItem('mama_journal_entries', JSON.stringify(sorted));
+    setEntries(sorted); // 立即更新状态，触发 UI 刷新
   };
 
   const addEntry = () => {
@@ -41,13 +48,14 @@ const Journal: React.FC = () => {
     saveToLocal([newEntry, ...entries]);
     setWeight('');
     setNote('');
-    setMood('😊');
-    setIsHistoryMode(false);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 2000);
   };
 
   const deleteEntry = (id: string) => {
     if (window.confirm("确定要删除这条历史记录吗？")) {
-      saveToLocal(entries.filter(e => e.id !== id));
+      const filtered = entries.filter(e => e.id !== id);
+      saveToLocal(filtered);
     }
   };
 
@@ -58,181 +66,142 @@ const Journal: React.FC = () => {
         saveToLocal([...parsed, ...entries]);
         setShowImport(false);
         setImportData('');
-        alert("导入成功！");
+        alert("历史数据导入成功！");
       }
     } catch (e) {
-      alert("导入格式错误，请检查 JSON 内容");
+      alert("数据格式不正确，请确保是 JSON 数组格式");
     }
   };
 
-  const getWeightChange = () => {
-    if (entries.length < 2) return null;
-    const current = entries[0].weight;
-    const earliest = entries[entries.length - 1].weight;
-    const diff = (current - earliest).toFixed(1);
-    return { diff: parseFloat(diff), label: parseFloat(diff) >= 0 ? '累计增重' : '累计减轻' };
-  };
-
-  const changeInfo = getWeightChange();
-
   return (
-    <div className="p-6 space-y-6 animate-fade-in pb-24">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">心情 & 体重记录</h1>
+    <div className="p-6 space-y-6 animate-fade-in pb-24 bg-[#fef2f2]">
+      <header className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">心情 & 体重记录</h1>
+          <p className="text-[10px] text-gray-400 font-medium">历史数据补录已启用</p>
+        </div>
         <button 
           onClick={() => setShowImport(!showImport)}
-          className="text-[10px] font-bold text-pink-500 bg-pink-50 px-3 py-1.5 rounded-full"
+          className="bg-white p-2 px-3 rounded-xl shadow-sm border border-pink-100 text-[10px] text-pink-500 font-bold"
         >
-          {showImport ? '关闭工具' : '导入/导出'}
+          {showImport ? '关闭工具' : '批量管理'}
         </button>
-      </div>
+      </header>
 
-      {/* 导入工具 */}
+      {/* 导入导出面板 */}
       {showImport && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-dashed border-pink-100 space-y-4 animate-slide-down">
-          <p className="text-xs text-gray-400">请粘贴历史数据的 JSON 数组，或点击导出备份数据。</p>
+        <div className="bg-white p-5 rounded-3xl border-2 border-dashed border-pink-200 space-y-3 animate-slide-down">
+          <p className="text-[10px] text-gray-400">在此粘贴过往记录的 JSON 数组进行补录：</p>
           <textarea 
             value={importData}
             onChange={e => setImportData(e.target.value)}
-            className="w-full h-24 bg-gray-50 border-none rounded-xl p-3 text-[10px] font-mono"
-            placeholder='[{"date":"2023-10-01","weight":55.5,"mood":"😊","note":"补录数据"}]'
+            className="w-full h-20 bg-pink-50/30 rounded-xl p-3 text-[10px] font-mono outline-none border border-pink-50"
+            placeholder='[{"date":"2023-12-01","weight":55,"mood":"😊","note":"补录"}]'
           />
           <div className="flex space-x-2">
-            <button onClick={handleImport} className="flex-1 bg-pink-500 text-white text-xs font-bold py-2 rounded-xl">执行导入</button>
+            <button onClick={handleImport} className="flex-1 bg-pink-500 text-white py-2 rounded-xl text-xs font-bold shadow-md shadow-pink-100">确认导入</button>
             <button onClick={() => {
-              const data = JSON.stringify(entries);
-              navigator.clipboard.writeText(data);
-              alert("已复制到剪贴板！");
-            }} className="flex-1 bg-gray-100 text-gray-600 text-xs font-bold py-2 rounded-xl">导出备份</button>
+              navigator.clipboard.writeText(JSON.stringify(entries));
+              alert("历史记录已复制，可用于迁移或备份");
+            }} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-xs font-bold">导出备份</button>
           </div>
         </div>
       )}
 
-      {/* 录入卡片 */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-pink-50 space-y-5">
-        <div className="flex justify-between items-center px-1">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-            {isHistoryMode ? '补录历史数据' : '记录今日状态'}
-          </span>
-          <button 
-            onClick={() => setIsHistoryMode(!isHistoryMode)}
-            className="text-[10px] text-pink-400 underline underline-offset-4"
-          >
-            {isHistoryMode ? '回到今天' : '录入历史记录'}
-          </button>
-        </div>
-
-        {isHistoryMode && (
-          <div className="animate-fade-in">
-            <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase ml-1">选择补录日期</label>
-            <input 
-              type="date" 
-              value={recordDate} 
-              onChange={e => setRecordDate(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm outline-none ring-2 ring-pink-100 focus:ring-pink-300 transition-all"
-            />
+      {/* 录入表单 */}
+      <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-pink-100/30 border border-white space-y-5 relative">
+        {showSuccess && (
+          <div className="absolute inset-0 bg-white/90 rounded-[2.5rem] flex flex-col items-center justify-center z-20 animate-fade-in">
+            <span className="text-4xl mb-2">✅</span>
+            <p className="text-pink-500 font-bold text-sm">记录已保存到历史列表</p>
           </div>
         )}
 
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">记录日期 (可补录过往)</label>
+          <input 
+            type="date" 
+            value={recordDate} 
+            onChange={e => setRecordDate(e.target.value)}
+            className="w-full bg-pink-50/50 border-none rounded-2xl p-4 text-sm font-bold text-pink-600 outline-none ring-2 ring-transparent focus:ring-pink-200 transition-all"
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase ml-1">今日体重 (kg)</label>
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">体重 (KG)</label>
             <input 
               type="number"
+              step="0.1"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-xl p-4 text-lg font-bold text-gray-700 outline-none"
+              className="w-full bg-gray-50 border-none rounded-2xl p-4 text-xl font-bold text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-pink-100 transition-all"
               placeholder="0.0"
             />
           </div>
-          <div>
-            <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase ml-1">当前心情</label>
+          <div className="space-y-1">
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">心情</label>
             <select 
               value={mood}
               onChange={(e) => setMood(e.target.value)}
-              className="w-full bg-gray-50 border-none rounded-xl p-4 text-2xl appearance-none text-center outline-none"
+              className="w-full bg-gray-50 border-none rounded-2xl p-4 text-2xl appearance-none text-center outline-none"
             >
               <option>😊</option><option>🥰</option><option>😴</option><option>😭</option><option>🤢</option>
             </select>
           </div>
         </div>
 
-        <div>
-          <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase ml-1">日记备注</label>
+        <div className="space-y-1">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">备注</label>
           <textarea 
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm text-gray-600 h-24 outline-none resize-none"
+            className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm text-gray-600 h-20 outline-none resize-none"
             placeholder="今天感觉怎么样？"
           />
         </div>
 
         <button 
           onClick={addEntry}
-          className="w-full bg-pink-500 text-white font-bold py-4 rounded-2xl shadow-xl shadow-pink-100 active:scale-95 transition-all"
+          className="w-full bg-gradient-to-r from-pink-500 to-rose-400 text-white font-bold py-4 rounded-2xl shadow-xl shadow-pink-200 active:scale-95 transition-all"
         >
           保存记录
         </button>
       </div>
 
-      {/* 体重趋势可视化 */}
-      {entries.length > 1 && (
-        <div className="bg-gradient-to-br from-pink-400 to-rose-500 p-6 rounded-[2.5rem] text-white shadow-xl shadow-pink-100">
-          <div className="flex justify-between items-end mb-6">
-            <div>
-              <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{changeInfo?.label}</p>
-              <p className="text-4xl font-bold">{Math.abs(changeInfo?.diff || 0)} <span className="text-sm font-normal">kg</span></p>
-            </div>
-            <p className="text-[10px] opacity-70 italic font-medium">累计监测 {entries.length} 天</p>
-          </div>
-          
-          <div className="flex items-end justify-between h-20 px-2 space-x-1">
-            {entries.slice(0, 15).reverse().map((e) => {
-              const max = Math.max(...entries.map(x => x.weight));
-              const min = Math.min(...entries.map(x => x.weight));
-              const height = max === min ? 50 : ((e.weight - min) / (max - min)) * 80 + 20;
-              return (
-                <div key={e.id} className="group relative flex-1 flex flex-col items-center">
-                  <div className="w-full bg-white/20 rounded-t-lg transition-all duration-300 group-hover:bg-white/50" style={{ height: `${height}%` }} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 历史记录列表 */}
+      {/* 历史列表展示区 */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-gray-800 flex justify-between items-center">
-          <span>历史数据展示</span>
-          <span className="text-[10px] text-gray-400 font-normal">点击记录可管理数据</span>
+        <h2 className="text-lg font-bold text-gray-800 px-1 flex justify-between items-center">
+          <span>历史足迹</span>
+          <span className="text-[10px] font-normal text-gray-400">共 {entries.length} 条</span>
         </h2>
+        
         {entries.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-4 opacity-20 grayscale">📒</div>
-            <p className="text-sm text-gray-300 italic">还没开始记录哦，补录一点历史数据吧</p>
+          <div className="bg-white p-12 rounded-[2.5rem] border border-dashed border-gray-200 flex flex-col items-center text-center space-y-4">
+            <div className="text-5xl opacity-20">📒</div>
+            <p className="text-gray-400 text-sm italic">还没有任何记录，尝试补录一个吧！</p>
           </div>
         ) : (
-          entries.map(entry => (
-            <div key={entry.id} className="group bg-white p-5 rounded-3xl flex items-center justify-between border border-transparent hover:border-pink-100 shadow-sm transition-all">
-              <div className="flex items-center space-x-4">
-                <span className="text-3xl drop-shadow-sm">{entry.mood}</span>
-                <div>
-                  <p className="text-base font-bold text-gray-800">{entry.weight} <span className="text-[10px] font-normal text-gray-400">kg</span></p>
-                  <p className="text-[10px] text-gray-500">{entry.date}</p>
+          <div className="relative space-y-4 before:content-[''] before:absolute before:left-[23px] before:top-4 before:bottom-4 before:w-[1px] before:bg-pink-100">
+            {entries.map(entry => (
+              <div key={entry.id} className="relative pl-12 animate-slide-up">
+                <div className="absolute left-[16px] top-4 w-3.5 h-3.5 rounded-full bg-white border-2 border-pink-400 z-10" />
+                <div className="group bg-white p-5 rounded-3xl flex items-center justify-between shadow-sm hover:shadow-md transition-all border border-transparent hover:border-pink-50">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-3xl drop-shadow-sm">{entry.mood}</span>
+                    <div>
+                      <p className="text-base font-bold text-gray-800">{entry.weight} <span className="text-[10px] font-normal text-gray-400">kg</span></p>
+                      <p className="text-[10px] text-pink-400 font-bold">{entry.date}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <p className="text-[10px] text-gray-400 italic max-w-[100px] truncate">{entry.note || '无备注'}</p>
+                    <button onClick={() => deleteEntry(entry.id)} className="p-2 text-rose-200 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">🗑️</button>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <p className="text-xs text-gray-400 max-w-[100px] truncate italic">{entry.note}</p>
-                <button 
-                  onClick={() => deleteEntry(entry.id)}
-                  className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
